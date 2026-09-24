@@ -58,7 +58,7 @@ uses a keyword router over the same tools. The header shows which mode is active
 
 ## Presentation
 
-The slide deck is in [docs/Fraud_Investigator_Tool.pptx](docs/Fraud_Investigator_Tool.pptx) (14 slides with speaker notes).
+The slide deck is in [docs/Fraud_Investigator_Tool.pptx](docs/Fraud_Investigator_Tool.pptx) (19 slides with speaker notes).
 
 ## Hosting
 

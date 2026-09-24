@@ -114,6 +114,13 @@ st.markdown("""
       border-radius: 50% !important; }
   .st-key-copilot [data-testid="stChatInputSubmitButton"] svg { fill: #FFFFFF !important; color: #FFFFFF !important; }
   .st-key-copilot [data-testid="stChatInputSubmitButton"]:disabled { background: #D7D7D7 !important; }
+  /* Cards: wrap between words only (fixes "Needs attentio / n"). */
+  [class*="st-key-kpi_"] button p, [class*="st-key-kpi_"] button div { word-break: normal !important;
+      overflow-wrap: normal !important; hyphens: none !important; white-space: normal !important; }
+  /* Suggestion chips and pager: wrap the label instead of truncating it with an ellipsis. */
+  .st-key-suggest button p, .st-key-suggest button div, .st-key-pager button p, .st-key-pager button div {
+      white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+  .st-key-pager button p { font-size: 1.1rem; line-height: 1; }
   .ck-pageinfo { text-align: center; padding-top: 0.45rem; font-size: 0.85rem; color: #52656B; }
   /* Tab bar: buttons styled as tabs (keeps programmatic switching, unlike st.tabs) */
   .st-key-tabbar { border-bottom: 1px solid #D5DEDB; margin-bottom: 0.8rem; }
@@ -210,6 +217,11 @@ def badge(level: str) -> str:
 
 def ts(t: float) -> str:
     return datetime.fromtimestamp(t).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def md(text) -> str:
+    """Escape $ so Streamlit Markdown never switches to LaTeX math between two amounts."""
+    return str(text).replace("$", "\\$")
 
 
 def money(v) -> str:
@@ -333,11 +345,11 @@ with left, st.container(key="queuepanel"):
                 st.rerun()
         with st.container(key="pager"):
             p1, p2, p3 = st.columns([1, 2.2, 1])
-            if p1.button("‹ Prev", key="pg_prev", disabled=pg["page"] <= 1, use_container_width=True):
+            if p1.button("‹", key="pg_prev", help="Previous page", disabled=pg["page"] <= 1, use_container_width=True):
                 ss.page = pg["page"] - 1
                 st.rerun()
             p2.markdown(f"<div class='ck-pageinfo'>Page <b>{pg['page']:,}</b> of {pg['pages']:,}</div>", unsafe_allow_html=True)
-            if p3.button("Next ›", key="pg_next", disabled=pg["page"] >= pg["pages"], use_container_width=True):
+            if p3.button("›", key="pg_next", help="Next page", disabled=pg["page"] >= pg["pages"], use_container_width=True):
                 ss.page = pg["page"] + 1
                 st.rerun()
         if pg["pages"] > 2:
@@ -371,9 +383,9 @@ def overview_tab():
                          use_container_width=True):
                 ss.filters, ss.chart, ss.chart_selection = dict(flt), None, None
                 st.rerun()
-    st.caption(f"Click a card to filter the queue; All cases resets. Queue exposure {money(s['total_claim_amount_usd'])}, "
+    st.caption(md(f"Click a card to filter the queue; All cases resets. Queue exposure {money(s['total_claim_amount_usd'])}, "
                f"of which {money(s['amount_in_high_priority_usd'])} is in high-priority cases. "
-               "Claim amount is exposure, not evidence.")
+               "Claim amount is exposure, not evidence."))
 
     c1, c2 = st.columns(2, gap="large")
     picked_care = (ss.filters.get("care_type") or [None])[0]
@@ -640,7 +652,7 @@ def case_analysis(case_id: str):
     with top[0]:
         st.markdown(f"### {case_id}  {badge(a.priority_level)}", unsafe_allow_html=True)
         st.markdown(f'<span class="ck-muted">{case["care_type"]}, {case["state"]}, {case["claim_date"]}, '
-                    f'claim {case["claim_number"]}, {money(case["claim_amount_usd"])}. Status: <b>{status}</b></span>',
+                    f'claim {case["claim_number"]}, {md(money(case["claim_amount_usd"]))}. Status: <b>{status}</b></span>',
                     unsafe_allow_html=True)
     with top[1]:
         st.markdown(f'<div class="ck-score" style="color:{LEVEL_COLOR[a.priority_level]}">{a.score:g}</div>'
@@ -656,26 +668,26 @@ def case_analysis(case_id: str):
     second = svc.disagreement(case_id)
     if second:
         (st.warning if second["kind"] == "unsupervised_flags" else st.info)(
-            "**Second opinion:** " + second["message"] + "  \n" + second["action"])
+            "**Second opinion:** " + md(second["message"]) + "  \n" + md(second["action"]))
 
     src = n.get("source", "deterministic")
     g = n.get("grounding", {})
     gtxt = "grounding check passed" if g.get("passed") else f"grounding check failed: {'; '.join(g.get('issues', [])[:2])}"
-    st.markdown(f'<div class="ck-summary"><b>Assessment</b><br>{n.get("summary", "")}<br><br>'
-                f'<b>Recommended next step:</b> {n.get("next_step") or a.recommended_next_step}<br>'
-                f'<span class="ck-muted"><b>Uncertainty:</b> {n.get("uncertainty") or a.uncertainty}</span><br>'
+    st.markdown(f'<div class="ck-summary"><b>Assessment</b><br>{md(n.get("summary", ""))}<br><br>'
+                f'<b>Recommended next step:</b> {md(n.get("next_step") or a.recommended_next_step)}<br>'
+                f'<span class="ck-muted"><b>Uncertainty:</b> {md(n.get("uncertainty") or a.uncertainty)}</span><br>'
                 f'<span class="ck-muted">Written by {cur["llm_model"]} ({src}), {gtxt}. Score from {a.ruleset_id}. '
                 f'Assessment v{cur["version"]}, {ts(cur["created_at"])}.</span></div>', unsafe_allow_html=True)
     with st.expander("What argues for a lower priority", expanded=a.priority_level != "red"):
         if a.mitigating:
             for m in a.mitigating:
-                st.markdown(f"- {m}")
+                st.markdown(f"- {md(m)}")
         else:
             st.markdown("Nothing in the data argues for a lower priority.")
         if a.caveats:
             st.markdown("**What the data cannot establish** (rule these out before escalating)")
             for c in a.caveats:
-                st.markdown(f"- {c}")
+                st.markdown(f"- {md(c)}")
     with st.expander("Related guidance"):
         for g in knowledge_base.for_assessment(a):
             st.markdown(f"**{g['citation']}**  \n{g['text']}")
@@ -834,7 +846,7 @@ def case_analysis(case_id: str):
     if notes:
         st.markdown("**Notes**")
         for nt in notes:
-            st.markdown(f"- {nt['note']}  \n  <span class='ck-muted'>{nt['author']}, {ts(nt['created_at'])}</span>",
+            st.markdown(f"- {md(nt['note'])}  \n  <span class='ck-muted'>{nt['author']}, {ts(nt['created_at'])}</span>",
                         unsafe_allow_html=True)
     with st.expander(f"Audit history ({len(history)} assessment version{'s' if len(history) != 1 else ''})",
                      expanded=len(history) > 1):
@@ -1047,10 +1059,10 @@ with right:
             for i, m in enumerate(ss.chat):
                 if m["role"] == "user":
                     with st.container(key=f"umsg_{i}"):
-                        st.markdown(m["content"], unsafe_allow_html=True)
+                        st.markdown(md(m["content"]), unsafe_allow_html=True)
                     continue
                 with st.container(key=f"amsg_{i}"):
-                    st.markdown(m["content"])
+                    st.markdown(md(m["content"]))
                     meta = m.get("meta") or {}
                     g = meta.get("grounding", {})
                     status = "✓ grounded in the data" if g.get("passed") else "⚠ unverified: " + "; ".join(g.get("issues", [])[:2])
