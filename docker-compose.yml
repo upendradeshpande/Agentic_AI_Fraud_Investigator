@@ -1,0 +1,12 @@
+services:
+  cockpit:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////app/state/cockpit.db
+    volumes:
+      - cockpit-state:/app/state
+volumes:
+  cockpit-state:

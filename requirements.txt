@@ -1,0 +1,10 @@
+streamlit>=1.40,<2
+plotly>=5.20
+altair>=5.0
+pandas>=2.1
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
+openpyxl>=3.1
+requests>=2.31
+pytest>=8.0

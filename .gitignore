@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+data/*.db
+data/*.db-*
+state/
+data/evaluation_results.json
+data/dev_synthetic_comparison.json

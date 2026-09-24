@@ -1,0 +1,210 @@
+{
+  "ruleset_id": "rules-v1.1",
+  "description": "Transparent triage ruleset. Group caps sum to 100 so the score never needs clipping and one underlying pattern cannot be counted several times. v1.1 adds the shared contact + service overlap combination (collusion pattern without duplicate billing).",
+  "continuous_scoring": {
+    "method": "robust_z",
+    "note": "robust_z = (value - reference median) / (1.4826 * MAD). Points scale linearly from z_start (0 points) to z_full (full points). Reference = the loaded queue.",
+    "z_start": 0.75,
+    "z_full": 3.0
+  },
+  "groups": {
+    "billing_integrity": {
+      "label": "Billing integrity",
+      "cap": 30
+    },
+    "relationship": {
+      "label": "Member-provider relationship",
+      "cap": 16
+    },
+    "utilization": {
+      "label": "Utilization pattern",
+      "cap": 20
+    },
+    "billing_pattern": {
+      "label": "Billing amount and pattern",
+      "cap": 20
+    },
+    "combination": {
+      "label": "Reinforcing combinations",
+      "cap": 14
+    }
+  },
+  "signals": {
+    "duplicate_service_billed": {
+      "type": "binary",
+      "group": "billing_integrity",
+      "points": 20,
+      "label": "Duplicate service billed",
+      "why": "The same service appears to be billed more than once."
+    },
+    "service_overlap_other_provider": {
+      "type": "binary",
+      "group": "billing_integrity",
+      "points": 18,
+      "label": "Service overlap with another provider",
+      "why": "Billed services overlap with services another provider billed for the same member."
+    },
+    "shared_contact_with_provider": {
+      "type": "binary",
+      "group": "relationship",
+      "points": 14,
+      "label": "Shared contact info with provider",
+      "why": "Member and provider share contact details, which is unusual for an independent care relationship."
+    },
+    "recent_policy_change_flag": {
+      "type": "binary",
+      "group": "relationship",
+      "points": 6,
+      "label": "Recent policy change",
+      "why": "The policy changed shortly before the claim. Weak on its own; often benign."
+    },
+    "weekly_visit_frequency": {
+      "type": "continuous",
+      "group": "utilization",
+      "points": 10,
+      "direction": "high",
+      "label": "Weekly visit frequency",
+      "unit": "visits/week",
+      "why": "Visits per week are high relative to the queue."
+    },
+    "member_provider_distance_miles": {
+      "type": "continuous",
+      "group": "utilization",
+      "points": 10,
+      "direction": "high",
+      "label": "Member-provider distance",
+      "unit": "miles",
+      "why": "The member lives far from the provider for recurring care."
+    },
+    "prior_claims_last_12mo": {
+      "type": "continuous",
+      "group": "utilization",
+      "points": 6,
+      "direction": "high",
+      "label": "Prior claims (12 months)",
+      "unit": "claims",
+      "why": "The member has many prior claims. Can also reflect genuine high care needs."
+    },
+    "amount_vs_peer_avg_pct": {
+      "type": "continuous",
+      "group": "billing_pattern",
+      "points": 10,
+      "direction": "high",
+      "label": "Amount vs peer average",
+      "unit": "% vs peer avg",
+      "why": "The claim amount is well above the peer average for similar claims."
+    },
+    "weekend_billing_ratio": {
+      "type": "continuous",
+      "group": "billing_pattern",
+      "points": 7,
+      "direction": "high",
+      "label": "Weekend billing ratio",
+      "unit": "share of visits",
+      "why": "A high share of visits are billed on weekends."
+    },
+    "round_dollar_billing_ratio": {
+      "type": "continuous",
+      "group": "billing_pattern",
+      "points": 7,
+      "direction": "high",
+      "label": "Round-dollar billing ratio",
+      "unit": "share of lines",
+      "why": "Many line items are billed in round dollar amounts, a common sign of estimated rather than recorded billing."
+    }
+  },
+  "combinations": [
+    {
+      "id": "combo_dup_overlap",
+      "points": 8,
+      "label": "Duplicate billing + service overlap",
+      "why": "Duplicate billing alongside overlapping services from another provider is harder to explain than either alone.",
+      "requires_binary": [
+        "duplicate_service_billed",
+        "service_overlap_other_provider"
+      ]
+    },
+    {
+      "id": "combo_contact_dup",
+      "points": 5,
+      "label": "Shared contact + duplicate billing",
+      "why": "Shared contact details plus duplicate billing raises the possibility of a non-arm's-length relationship.",
+      "requires_binary": [
+        "shared_contact_with_provider",
+        "duplicate_service_billed"
+      ]
+    },
+    {
+      "id": "combo_contact_overlap",
+      "points": 5,
+      "label": "Shared contact + service overlap",
+      "why": "Shared contact details together with services overlapping another provider's suggest a coordinated arrangement, even without duplicate billing.",
+      "requires_binary": [
+        "shared_contact_with_provider",
+        "service_overlap_other_provider"
+      ]
+    },
+    {
+      "id": "combo_freq_distance",
+      "points": 5,
+      "label": "High frequency + long distance",
+      "why": "Frequent visits combined with long travel distance is operationally unlikely.",
+      "requires_unusual": [
+        "weekly_visit_frequency",
+        "member_provider_distance_miles"
+      ]
+    },
+    {
+      "id": "combo_amount_pattern",
+      "points": 5,
+      "label": "High amount + unusual billing pattern",
+      "why": "A high amount combined with weekend or round-dollar billing is a stronger pattern than amount alone.",
+      "requires_unusual": [
+        "amount_vs_peer_avg_pct"
+      ],
+      "requires_any_unusual": [
+        "weekend_billing_ratio",
+        "round_dollar_billing_ratio"
+      ]
+    },
+    {
+      "id": "combo_broad_elevation",
+      "points": 6,
+      "label": "Several moderately unusual signals",
+      "why": "Three or more utilization or billing signals are each moderately above the queue norm. No single one is alarming, but together they are unusual.",
+      "requires_count_unusual": {
+        "signals": [
+          "weekly_visit_frequency",
+          "member_provider_distance_miles",
+          "prior_claims_last_12mo",
+          "amount_vs_peer_avg_pct",
+          "weekend_billing_ratio",
+          "round_dollar_billing_ratio"
+        ],
+        "min": 3,
+        "z": 1.0
+      }
+    }
+  ],
+  "unusual_z": 2.0,
+  "strong_indicators": [
+    {
+      "id": "strong_dup_overlap",
+      "label": "Policy strong indicator: duplicate billing with service overlap",
+      "requires_binary": [
+        "duplicate_service_billed",
+        "service_overlap_other_provider"
+      ]
+    }
+  ],
+  "thresholds": {
+    "red": 60,
+    "yellow": 20
+  },
+  "confidence": {
+    "min_cohort_size": 8,
+    "perturbation_pct": 0.2,
+    "perturbation_runs": 200,
+    "stability_threshold": 0.85
+  }
+}

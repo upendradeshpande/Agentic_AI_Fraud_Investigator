@@ -1,0 +1,6 @@
+# Google ADK runtime (AGENT_RUNTIME=adk)
+google-adk>=1.0
+# Needed by ADK for non-Gemini models (Claude, OpenAI) via LiteLLM
+litellm>=1.40
+# MCP tool server (python -m cockpit.mcp_server)
+mcp>=1.2
